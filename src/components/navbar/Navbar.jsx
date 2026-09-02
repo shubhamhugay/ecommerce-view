@@ -1,12 +1,9 @@
 import { useContext } from "react";
-
 import {
     Link,
     useNavigate,
 } from "react-router-dom";
-
 import { AuthContext } from "../../context/AuthContext";
-
 
 function Navbar() {
 
@@ -18,6 +15,7 @@ function Navbar() {
     isAuthenticated,
     logout,
   } = useContext(AuthContext);
+
 
 
   const handleLogout = () => {
@@ -81,6 +79,22 @@ function Navbar() {
                 <i className="bx bx-home-alt me-1"></i>
 
                 Home
+
+              </Link>
+
+            </li>
+
+
+            <li className="nav-item">
+
+              <Link
+                className="nav-link"
+                to="/products"
+              >
+
+                <i className="bx bx-store me-1"></i>
+
+                Products
 
               </Link>
 
