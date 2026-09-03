@@ -1,9 +1,17 @@
 import { useContext } from "react";
+
 import {
-    Link,
-    useNavigate,
+  Link,
+  useNavigate,
 } from "react-router-dom";
-import { AuthContext } from "../../context/AuthContext";
+
+import {
+  AuthContext,
+} from "../../context/AuthContext";
+
+import {
+  CartContext,
+} from "../../context/CartContext";
 
 function Navbar() {
 
@@ -11,11 +19,13 @@ function Navbar() {
 
 
   const {
-    user,
-    isAuthenticated,
-    logout,
+    user, isAuthenticated, logout,
   } = useContext(AuthContext);
 
+
+  const {
+    cartCount,
+  } = useContext(CartContext);
 
 
   const handleLogout = () => {
@@ -33,6 +43,8 @@ function Navbar() {
       <div className="container">
 
 
+        {/* BRAND */}
+
         <Link
           className="navbar-brand fw-bold d-flex align-items-center"
           to="/"
@@ -44,6 +56,9 @@ function Navbar() {
 
         </Link>
 
+
+
+        {/* MOBILE BUTTON */}
 
         <button
           className="navbar-toggler"
@@ -60,11 +75,14 @@ function Navbar() {
         </button>
 
 
+
         <div
           className="collapse navbar-collapse"
           id="mainNavbar"
         >
 
+
+          {/* LEFT SIDE */}
 
           <ul className="navbar-nav me-auto mb-2 mb-lg-0">
 
@@ -104,6 +122,9 @@ function Navbar() {
           </ul>
 
 
+
+          {/* RIGHT SIDE */}
+
           <div className="d-flex align-items-lg-center gap-2">
 
 
@@ -140,6 +161,31 @@ function Navbar() {
 
               <>
 
+
+                {/* CART */}
+
+                <Link
+                  to="/cart"
+                  className="btn btn-outline-light"
+                >
+
+                  <i className="bx bx-cart me-1"></i>
+
+                  Cart
+
+
+                  <span className="badge text-bg-danger ms-2">
+
+                    {cartCount}
+
+                  </span>
+
+                </Link>
+
+
+
+                {/* USER */}
+
                 <span className="text-light me-lg-2">
 
                   <i className="bx bx-user-circle me-1"></i>
@@ -148,6 +194,9 @@ function Navbar() {
 
                 </span>
 
+
+
+                {/* LOGOUT */}
 
                 <button
                   className="btn btn-outline-danger"
@@ -160,6 +209,7 @@ function Navbar() {
 
                 </button>
 
+
               </>
 
             )}
@@ -170,12 +220,13 @@ function Navbar() {
 
         </div>
 
+
       </div>
 
     </nav>
 
   );
-}
+};
 
 
 export default Navbar;

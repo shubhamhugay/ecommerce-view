@@ -17,7 +17,7 @@ function Products() {
   const [products, setProducts] = useState([]);
 
 
-  // What user is currently typing
+  // What user is currently typing  
   const [searchText, setSearchText] = useState("");
 
 

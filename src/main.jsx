@@ -10,13 +10,23 @@ import "boxicons/css/boxicons.min.css";
 
 import { RouterProvider } from 'react-router-dom';
 import AuthProvider from './context/AuthContext';
+import CartProvider from './context/CartContext';
 import router from './routes/router';
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
-     <AuthProvider>
-      <RouterProvider router={router} />
-      </AuthProvider>
-     
-  </StrictMode>,
+ <StrictMode>
+
+    <AuthProvider>
+
+      <CartProvider>
+
+        <RouterProvider
+          router={router}
+        />
+
+      </CartProvider>
+
+    </AuthProvider>
+
+  </StrictMode>
 )

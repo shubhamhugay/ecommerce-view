@@ -1,29 +1,62 @@
 import {
-    useEffect,
-    useState,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 
 import {
-    Link,
-    useParams,
+  Link,
+  useNavigate,
+  useParams,
 } from "react-router-dom";
 
 import {
-    getProductById,
-} from "../../service/ProductService.jsx";
+  getProductById,
+} from "../../service/productService.jsx";
 
+import {
+  AuthContext,
+} from "../../context/AuthContext.jsx";
+
+import {
+  CartContext,
+} from "../../context/CartContext.jsx";
 
 
 function ProductDetails() {
 
   const { id } = useParams();
 
+  const navigate = useNavigate();
 
-  const [product, setProduct] = useState(null);
 
-  const [loading, setLoading] = useState(true);
+  const {
+    isAuthenticated,
+  } = useContext(AuthContext);
 
-  const [error, setError] = useState("");
+
+  const {
+    addToCart,
+  } = useContext(CartContext);
+
+
+  const [product, setProduct] =
+    useState(null);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  const [cartMessage, setCartMessage] =
+    useState("");
+
+  const [cartError, setCartError] =
+    useState("");
+
+  const [addingToCart, setAddingToCart] =
+    useState(false);
 
 
   useEffect(() => {
@@ -57,6 +90,53 @@ function ProductDetails() {
   }, [id]);
 
 
+  const handleAddToCart = async () => {
+
+    setCartMessage("");
+    setCartError("");
+
+
+    if (!isAuthenticated) {
+
+      navigate("/login");
+
+      return;
+    }
+
+
+    try {
+
+      setAddingToCart(true);
+
+
+      await addToCart(
+        product.id,
+        1
+      );
+
+
+      setCartMessage(
+        "Product added to cart successfully"
+      );
+
+
+    } catch (error) {
+
+      setCartError(
+        error.response?.data?.message ||
+        error.message ||
+        "Unable to add product to cart"
+      );
+
+
+    } finally {
+
+      setAddingToCart(false);
+
+    }
+  };
+
+
   if (loading) {
 
     return (
@@ -74,6 +154,7 @@ function ProductDetails() {
         </p>
 
       </div>
+
     );
   }
 
@@ -105,6 +186,7 @@ function ProductDetails() {
         </Link>
 
       </div>
+
     );
   }
 
@@ -137,6 +219,8 @@ function ProductDetails() {
 
           <div className="row g-5">
 
+
+            {/* PRODUCT IMAGES */}
 
             <div className="col-lg-6">
 
@@ -191,7 +275,8 @@ function ProductDetails() {
                         data-bs-slide="prev"
                       >
 
-                        <span className="carousel-control-prev-icon bg-dark rounded-circle p-3"></span>
+                        <span className="carousel-control-prev-icon bg-dark rounded-circle p-3">
+                        </span>
 
                         <span className="visually-hidden">
                           Previous
@@ -207,7 +292,8 @@ function ProductDetails() {
                         data-bs-slide="next"
                       >
 
-                        <span className="carousel-control-next-icon bg-dark rounded-circle p-3"></span>
+                        <span className="carousel-control-next-icon bg-dark rounded-circle p-3">
+                        </span>
 
                         <span className="visually-hidden">
                           Next
@@ -243,6 +329,9 @@ function ProductDetails() {
 
             </div>
 
+
+
+            {/* PRODUCT INFORMATION */}
 
             <div className="col-lg-6">
 
@@ -297,6 +386,8 @@ function ProductDetails() {
 
                   <span className="badge text-bg-danger fs-6">
 
+                    <i className="bx bx-x-circle me-1"></i>
+
                     Out of Stock
 
                   </span>
@@ -306,25 +397,90 @@ function ProductDetails() {
               </div>
 
 
+
+              {/* SUCCESS MESSAGE */}
+
+              {cartMessage && (
+
+                <div className="alert alert-success">
+
+                  <i className="bx bx-check-circle me-2"></i>
+
+                  {cartMessage}
+
+                </div>
+
+              )}
+
+
+
+              {/* CART ERROR */}
+
+              {cartError && (
+
+                <div className="alert alert-danger">
+
+                  <i className="bx bx-error-circle me-2"></i>
+
+                  {cartError}
+
+                </div>
+
+              )}
+
+
+
+              {/* ADD TO CART */}
+
               <button
                 className="btn btn-primary btn-lg w-100"
-                disabled={product.stock === 0}
+                onClick={handleAddToCart}
+                disabled={
+                  product.stock === 0 ||
+                  addingToCart
+                }
               >
 
-                <i className="bx bx-cart-add me-2"></i>
+                {addingToCart ? (
 
-                Add to Cart
+                  <>
+
+                    <span
+                      className="spinner-border spinner-border-sm me-2"
+                      role="status"
+                    >
+                    </span>
+
+                    Adding...
+
+                  </>
+
+                ) : (
+
+                  <>
+
+                    <i className="bx bx-cart-add me-2"></i>
+
+                    Add to Cart
+
+                  </>
+
+                )}
 
               </button>
 
 
-              <p className="text-secondary small mt-3 mb-0">
+              {!isAuthenticated && product.stock > 0 && (
 
-                <i className="bx bx-info-circle me-1"></i>
+                <p className="text-secondary small mt-3 mb-0">
 
-                Cart functionality will be connected in the next module.
+                  <i className="bx bx-info-circle me-1"></i>
 
-              </p>
+                  Please login before adding products to your cart.
+
+                </p>
+
+              )}
 
 
             </div>
@@ -337,8 +493,8 @@ function ProductDetails() {
 
       </div>
 
-
     </div>
+
   );
 }
 
