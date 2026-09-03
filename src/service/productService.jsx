@@ -3,10 +3,21 @@ import axios from "axios";
 const BASE_URL = "http://localhost:8080";
 
 
-const getAllProducts = () => {
+const getAllProducts = (
+  keyword,
+  page,
+  size
+) => {
 
   return axios.get(
-    `${BASE_URL}/products`
+    `${BASE_URL}/products`,
+    {
+      params: {
+        keyword: keyword,
+        page: page,
+        size: size,
+      },
+    }
   );
 };
 
@@ -20,6 +31,6 @@ const getProductById = (id) => {
 
 
 export {
-    getAllProducts,
-    getProductById
+  getAllProducts,
+  getProductById
 };
