@@ -1,24 +1,35 @@
 import {
-    useContext,
-    useState,
+  useContext,
+  useState,
 } from "react";
 
 import {
-    Link,
+  Link,
+  useNavigate,
 } from "react-router-dom";
 
 import {
-    AuthContext,
+  AuthContext,
 } from "../../context/AuthContext.jsx";
 
 import {
-    CartContext,
+  CartContext,
 } from "../../context/CartContext.jsx";
+
+import {
+  createCheckout,
+  verifyPayment,
+} from "../../service/CheckoutService.jsx";
 
 
 function Cart() {
 
+  const navigate =
+    useNavigate();
+
+
   const {
+    user,
     isAuthenticated,
   } = useContext(AuthContext);
 
@@ -31,6 +42,7 @@ function Cart() {
     updateQuantity,
     removeFromCart,
     clearCart,
+    loadCart,
   } = useContext(CartContext);
 
 
@@ -38,12 +50,28 @@ function Cart() {
     useState("");
 
 
-  const [processingProductId, setProcessingProductId] =
-    useState(null);
+  const [
+    processingProductId,
+    setProcessingProductId,
+  ] = useState(null);
 
 
-  const [clearingCart, setClearingCart] =
-    useState(false);
+  const [
+    clearingCart,
+    setClearingCart,
+  ] = useState(false);
+
+
+  const [
+    paymentLoading,
+    setPaymentLoading,
+  ] = useState(false);
+
+
+  const [
+    paymentError,
+    setPaymentError,
+  ] = useState("");
 
 
   // =================================
@@ -57,7 +85,9 @@ function Cart() {
 
     setActionError("");
 
-    setProcessingProductId(productId);
+    setProcessingProductId(
+      productId
+    );
 
 
     try {
@@ -67,6 +97,7 @@ function Cart() {
         quantity
       );
 
+
     } catch (error) {
 
       setActionError(
@@ -74,9 +105,12 @@ function Cart() {
         "Unable to update quantity"
       );
 
+
     } finally {
 
-      setProcessingProductId(null);
+      setProcessingProductId(
+        null
+      );
 
     }
   };
@@ -92,12 +126,17 @@ function Cart() {
 
     setActionError("");
 
-    setProcessingProductId(productId);
+    setProcessingProductId(
+      productId
+    );
 
 
     try {
 
-      await removeFromCart(productId);
+      await removeFromCart(
+        productId
+      );
+
 
     } catch (error) {
 
@@ -106,16 +145,19 @@ function Cart() {
         "Unable to remove product"
       );
 
+
     } finally {
 
-      setProcessingProductId(null);
+      setProcessingProductId(
+        null
+      );
 
     }
   };
 
 
   // =================================
-  // CLEAR ENTIRE CART
+  // CLEAR CART
   // =================================
 
   const handleClearCart = async () => {
@@ -129,6 +171,7 @@ function Cart() {
 
       await clearCart();
 
+
     } catch (error) {
 
       setActionError(
@@ -136,9 +179,233 @@ function Cart() {
         "Unable to clear cart"
       );
 
+
     } finally {
 
       setClearingCart(false);
+
+    }
+  };
+
+
+  // =================================
+  // CHECKOUT
+  // =================================
+
+  const handleCheckout = async () => {
+
+    setPaymentError("");
+
+
+    // Razorpay script must be loaded
+
+    if (!window.Razorpay) {
+
+      setPaymentError(
+        "Payment service is not available. Please refresh the page."
+      );
+
+      return;
+    }
+
+
+    const token =
+      localStorage.getItem(
+        "authToken"
+      );
+
+
+    if (!token) {
+
+      navigate("/login");
+
+      return;
+    }
+
+
+    try {
+
+      setPaymentLoading(true);
+
+
+      // =================================
+      // 1. CREATE CHECKOUT ON BACKEND
+      // =================================
+
+      const checkoutResponse =
+        await createCheckout(
+          token
+        );
+
+
+      const checkout =
+        checkoutResponse.data;
+
+
+      // =================================
+      // 2. RAZORPAY OPTIONS
+      // =================================
+
+      const options = {
+
+        key:
+          checkout.keyId,
+
+
+        amount:
+          checkout.amount,
+
+
+        currency:
+          checkout.currency,
+
+
+        name:
+          "Amozone",
+
+
+        description:
+          "Order Payment",
+
+
+        order_id:
+          checkout.razorpayOrderId,
+
+
+        // Customer information
+
+        prefill: {
+
+          name:
+            user?.username || "",
+
+          email:
+            user?.email || "",
+
+        },
+
+
+        // =================================
+        // PAYMENT SUCCESS
+        // =================================
+
+        handler: async function (
+          response
+        ) {
+
+          try {
+
+            // Data returned by Razorpay
+
+            const paymentData = {
+
+              razorpayOrderId:
+                response
+                  .razorpay_order_id,
+
+
+              razorpayPaymentId:
+                response
+                  .razorpay_payment_id,
+
+
+              razorpaySignature:
+                response
+                  .razorpay_signature,
+
+            };
+
+
+            // =================================
+            // 3. VERIFY PAYMENT
+            // =================================
+
+            const verificationResponse =
+              await verifyPayment(
+                paymentData,
+                token
+              );
+
+
+            const paidOrder =
+              verificationResponse.data;
+
+
+            // =================================
+            // 4. REFRESH CART
+            // =================================
+
+            await loadCart();
+
+
+            // =================================
+            // 5. SUCCESS PAGE
+            // =================================
+
+            navigate(
+              `/order-success/${paidOrder.id}`
+            );
+
+
+          } catch (error) {
+
+            setPaymentError(
+              error.response?.data?.message ||
+              "Payment verification failed"
+            );
+
+
+          } finally {
+
+            setPaymentLoading(
+              false
+            );
+
+          }
+        },
+
+
+        // User closes Razorpay popup
+
+        modal: {
+
+          ondismiss: function () {
+
+            setPaymentLoading(
+              false
+            );
+
+          },
+
+        },
+
+      };
+
+
+      // =================================
+      // OPEN RAZORPAY
+      // =================================
+
+      const razorpay =
+        new window.Razorpay(
+          options
+        );
+
+
+      razorpay.open();
+
+
+    } catch (error) {
+
+      setPaymentError(
+        error.response?.data?.message ||
+        "Unable to start checkout"
+      );
+
+
+      setPaymentLoading(
+        false
+      );
 
     }
   };
@@ -167,7 +434,9 @@ function Cart() {
 
 
                 <h3 className="fw-bold mt-3">
+
                   Login Required
+
                 </h3>
 
 
@@ -222,7 +491,9 @@ function Cart() {
 
 
         <p className="text-secondary mt-3">
+
           Loading your cart...
+
         </p>
 
       </div>
@@ -257,7 +528,15 @@ function Cart() {
 
           <p className="text-secondary mb-0">
 
-            {cartCount} item{cartCount !== 1 ? "s" : ""} in your cart
+            {cartCount}
+
+            {" "}
+
+            item{cartCount !== 1 ? "s" : ""}
+
+            {" "}
+
+            in your cart
 
           </p>
 
@@ -279,7 +558,7 @@ function Cart() {
 
 
 
-      {/* API ERROR */}
+      {/* CART API ERROR */}
 
       {error && (
 
@@ -295,7 +574,7 @@ function Cart() {
 
 
 
-      {/* ACTION ERROR */}
+      {/* CART ACTION ERROR */}
 
       {actionError && (
 
@@ -304,6 +583,22 @@ function Cart() {
           <i className="bx bx-error-circle me-2"></i>
 
           {actionError}
+
+        </div>
+
+      )}
+
+
+
+      {/* PAYMENT ERROR */}
+
+      {paymentError && (
+
+        <div className="alert alert-danger">
+
+          <i className="bx bx-error-circle me-2"></i>
+
+          {paymentError}
 
         </div>
 
@@ -324,7 +619,9 @@ function Cart() {
 
 
             <h3 className="fw-bold mt-3">
+
               Your cart is empty
+
             </h3>
 
 
@@ -364,214 +661,251 @@ function Cart() {
             <div className="d-flex flex-column gap-3">
 
 
-              {cart.items.map((item) => {
-
-                const product =
-                  item.product;
+              {cart.items.map(
+                (item) => {
 
 
-                const firstImage =
-                  product.imageUrls &&
-                  product.imageUrls.length > 0
-                    ? product.imageUrls[0]
-                    : null;
+                  const product =
+                    item.product;
 
 
-                const isProcessing =
-                  processingProductId === product.id;
+                  const firstImage =
+                    product.imageUrls &&
+                    product.imageUrls.length > 0
+                      ? product.imageUrls[0]
+                      : null;
 
 
-                const maximumQuantityReached =
-                  item.quantity >= product.stock;
+                  const isProcessing =
+                    processingProductId ===
+                    product.id;
 
 
-                return (
-
-                  <div
-                    className="card border-0 shadow-sm"
-                    key={item.id}
-                  >
-
-                    <div className="card-body">
+                  const maximumQuantityReached =
+                    item.quantity >=
+                    product.stock;
 
 
-                      <div className="row align-items-center g-3">
+                  return (
+
+                    <div
+                      className="card border-0 shadow-sm"
+                      key={item.id}
+                    >
+
+                      <div className="card-body">
 
 
-                        {/* IMAGE */}
-
-                        <div className="col-md-3 text-center">
+                        <div className="row align-items-center g-3">
 
 
-                          {firstImage ? (
+                          {/* IMAGE */}
 
-                            <img
-                              src={firstImage}
-                              alt={product.name}
-                              className="img-fluid object-fit-contain"
-                              style={{
-                                height: "140px",
-                              }}
-                            />
+                          <div className="col-md-3 text-center">
 
-                          ) : (
 
-                            <div
-                              className="
-                                bg-light
-                                d-flex
-                                justify-content-center
-                                align-items-center
-                              "
-                              style={{
-                                height: "140px",
-                              }}
+                            {firstImage ? (
+
+                              <img
+                                src={firstImage}
+                                alt={product.name}
+                                className="img-fluid object-fit-contain"
+                                style={{
+                                  height: "140px",
+                                }}
+                              />
+
+                            ) : (
+
+                              <div
+                                className="
+                                  bg-light
+                                  d-flex
+                                  justify-content-center
+                                  align-items-center
+                                "
+                                style={{
+                                  height: "140px",
+                                }}
+                              >
+
+                                <i className="bx bx-image fs-1 text-secondary"></i>
+
+                              </div>
+
+                            )}
+
+
+                          </div>
+
+
+
+                          {/* PRODUCT INFO */}
+
+                          <div className="col-md-5">
+
+
+                            <Link
+                              to={`/products/${product.id}`}
+                              className="text-decoration-none text-dark"
                             >
 
-                              <i className="bx bx-image fs-1 text-secondary"></i>
+                              <h5 className="fw-bold mb-2">
+
+                                {product.name}
+
+                              </h5>
+
+                            </Link>
+
+
+                            <p className="text-primary fw-semibold mb-2">
+
+                              ₹{Number(
+                                product.price
+                              ).toLocaleString(
+                                "en-IN"
+                              )}
+
+                            </p>
+
+
+                            <p className="text-secondary small mb-2">
+
+                              Available Stock:
+
+                              {" "}
+
+                              {product.stock}
+
+                            </p>
+
+
+                            {maximumQuantityReached && (
+
+                              <span className="badge text-bg-warning">
+
+                                Maximum available quantity reached
+
+                              </span>
+
+                            )}
+
+
+                          </div>
+
+
+
+                          {/* QUANTITY */}
+
+                          <div className="col-md-4 text-md-end">
+
+
+                            <p className="small text-secondary mb-2">
+
+                              Quantity
+
+                            </p>
+
+
+                            <div
+                              className="btn-group mb-3"
+                              role="group"
+                            >
+
+
+                              <button
+                                className="btn btn-outline-secondary"
+                                disabled={
+                                  item.quantity <= 1 ||
+                                  isProcessing
+                                }
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    product.id,
+                                    item.quantity - 1
+                                  )
+                                }
+                              >
+
+                                <i className="bx bx-minus"></i>
+
+                              </button>
+
+
+                              <button
+                                className="btn btn-outline-secondary disabled"
+                              >
+
+                                {isProcessing ? (
+
+                                  <span
+                                    className="spinner-border spinner-border-sm"
+                                    role="status"
+                                  >
+                                  </span>
+
+                                ) : (
+
+                                  item.quantity
+
+                                )}
+
+                              </button>
+
+
+                              <button
+                                className="btn btn-outline-secondary"
+                                disabled={
+                                  maximumQuantityReached ||
+                                  isProcessing
+                                }
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    product.id,
+                                    item.quantity + 1
+                                  )
+                                }
+                              >
+
+                                <i className="bx bx-plus"></i>
+
+                              </button>
+
 
                             </div>
 
-                          )}
 
+                            <p className="mb-2">
 
-                        </div>
+                              Subtotal:
 
+                              <strong className="ms-2">
 
+                                ₹{Number(
+                                  item.subTotal
+                                ).toLocaleString(
+                                  "en-IN"
+                                )}
 
-                        {/* PRODUCT INFORMATION */}
+                              </strong>
 
-                        <div className="col-md-5">
+                            </p>
 
-
-                          <Link
-                            to={`/products/${product.id}`}
-                            className="text-decoration-none text-dark"
-                          >
-
-                            <h5 className="fw-bold mb-2">
-
-                              {product.name}
-
-                            </h5>
-
-                          </Link>
-
-
-                          <p className="text-primary fw-semibold mb-2">
-
-                            ₹{Number(product.price)
-                              .toLocaleString("en-IN")}
-
-                          </p>
-
-
-                          <p className="text-secondary small mb-2">
-
-                            Available Stock: {product.stock}
-
-                          </p>
-
-
-                          {maximumQuantityReached && (
-
-                            <span className="badge text-bg-warning">
-
-                              Maximum available quantity reached
-
-                            </span>
-
-                          )}
-
-
-                        </div>
-
-
-
-                        {/* QUANTITY */}
-
-                        <div className="col-md-4 text-md-end">
-
-
-                          <p className="small text-secondary mb-2">
-
-                            Quantity
-
-                          </p>
-
-
-                          <div
-                            className="
-                              btn-group
-                              mb-3
-                            "
-                            role="group"
-                          >
-
-
-                            {/* MINUS */}
 
                             <button
-                              className="btn btn-outline-secondary"
-                              disabled={
-                                item.quantity <= 1 ||
-                                isProcessing
-                              }
+                              className="btn btn-outline-danger btn-sm"
+                              disabled={isProcessing}
                               onClick={() =>
-                                handleQuantityChange(
-                                  product.id,
-                                  item.quantity - 1
+                                handleRemove(
+                                  product.id
                                 )
                               }
                             >
 
-                              <i className="bx bx-minus"></i>
+                              <i className="bx bx-trash me-1"></i>
 
-                            </button>
-
-
-
-                            {/* CURRENT QUANTITY */}
-
-                            <button
-                              className="btn btn-outline-secondary disabled"
-                            >
-
-                              {isProcessing ? (
-
-                                <span
-                                  className="spinner-border spinner-border-sm"
-                                  role="status"
-                                >
-                                </span>
-
-                              ) : (
-
-                                item.quantity
-
-                              )}
-
-                            </button>
-
-
-
-                            {/* PLUS */}
-
-                            <button
-                              className="btn btn-outline-secondary"
-                              disabled={
-                                maximumQuantityReached ||
-                                isProcessing
-                              }
-                              onClick={() =>
-                                handleQuantityChange(
-                                  product.id,
-                                  item.quantity + 1
-                                )
-                              }
-                            >
-
-                              <i className="bx bx-plus"></i>
+                              Remove
 
                             </button>
 
@@ -579,57 +913,19 @@ function Cart() {
                           </div>
 
 
-
-                          {/* SUBTOTAL */}
-
-                          <p className="mb-2">
-
-                            Subtotal:
-
-                            <strong className="ms-2">
-
-                              ₹{Number(item.subTotal)
-                                .toLocaleString("en-IN")}
-
-                            </strong>
-
-                          </p>
-
-
-
-                          {/* REMOVE */}
-
-                          <button
-                            className="btn btn-outline-danger btn-sm"
-                            disabled={isProcessing}
-                            onClick={() =>
-                              handleRemove(product.id)
-                            }
-                          >
-
-                            <i className="bx bx-trash me-1"></i>
-
-                            Remove
-
-                          </button>
-
-
                         </div>
-
 
                       </div>
 
                     </div>
 
-                  </div>
+                  );
 
-                );
-
-              })}
+                }
+              )}
 
 
             </div>
-
 
           </div>
 
@@ -663,9 +959,10 @@ function Cart() {
 
                   </span>
 
-
                   <strong>
+
                     {cartCount}
+
                   </strong>
 
                 </div>
@@ -679,9 +976,10 @@ function Cart() {
 
                   </span>
 
-
                   <strong>
+
                     {cart.items.length}
+
                   </strong>
 
                 </div>
@@ -701,8 +999,11 @@ function Cart() {
 
                   <h4 className="fw-bold text-primary mb-0">
 
-                    ₹{Number(cart.totalAmount)
-                      .toLocaleString("en-IN")}
+                    ₹{Number(
+                      cart.totalAmount
+                    ).toLocaleString(
+                      "en-IN"
+                    )}
 
                   </h4>
 
@@ -710,25 +1011,41 @@ function Cart() {
 
 
 
-                {/* CHECKOUT */}
+                {/* CHECKOUT BUTTON */}
 
                 <button
                   className="btn btn-primary btn-lg w-100 mb-3"
-                  disabled
+                  disabled={paymentLoading}
+                  onClick={handleCheckout}
                 >
 
-                  <i className="bx bx-credit-card me-2"></i>
+                  {paymentLoading ? (
 
-                  Proceed to Checkout
+                    <>
+
+                      <span
+                        className="spinner-border spinner-border-sm me-2"
+                        role="status"
+                      >
+                      </span>
+
+                      Processing...
+
+                    </>
+
+                  ) : (
+
+                    <>
+
+                      <i className="bx bx-credit-card me-2"></i>
+
+                      Proceed to Checkout
+
+                    </>
+
+                  )}
 
                 </button>
-
-
-                <p className="text-secondary small text-center">
-
-                  Checkout will be connected in the next module.
-
-                </p>
 
 
 
@@ -740,8 +1057,13 @@ function Cart() {
 
                 <button
                   className="btn btn-outline-danger w-100"
-                  disabled={clearingCart}
-                  onClick={handleClearCart}
+                  disabled={
+                    clearingCart ||
+                    paymentLoading
+                  }
+                  onClick={
+                    handleClearCart
+                  }
                 >
 
                   {clearingCart ? (
@@ -776,7 +1098,6 @@ function Cart() {
               </div>
 
             </div>
-
 
           </div>
 

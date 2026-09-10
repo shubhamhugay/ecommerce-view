@@ -13,13 +13,19 @@ import {
   CartContext,
 } from "../../context/CartContext";
 
+
+
+
 function Navbar() {
 
-  const navigate = useNavigate();
+  const navigate =
+    useNavigate();
 
 
   const {
-    user, isAuthenticated, logout,
+    user,
+    isAuthenticated,
+    logout,
   } = useContext(AuthContext);
 
 
@@ -184,6 +190,21 @@ function Navbar() {
 
 
 
+                {/* MY ORDERS */}
+
+                <Link
+                  to="/orders"
+                  className="btn btn-outline-light"
+                >
+
+                  <i className="bx bx-receipt me-1"></i>
+
+                  My Orders
+
+                </Link>
+
+
+
                 {/* USER */}
 
                 <span className="text-light me-lg-2">
@@ -220,13 +241,12 @@ function Navbar() {
 
         </div>
 
-
       </div>
 
     </nav>
 
   );
-};
+}
 
 
 export default Navbar;
